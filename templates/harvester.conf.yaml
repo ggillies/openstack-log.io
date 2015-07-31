@@ -1,0 +1,35 @@
+exports.config = {
+  nodeName: "{{ inventory_hostname }}",
+  logStreams: {
+    keystone: [
+    "/var/log/keystone/keystone.log"
+     ],
+    glance: [
+    "/var/log/glance/api.log",
+    "/var/log/glance/registry.log"
+    ],
+    nova: [
+    "/var/log/nova/nova-api.log",
+    "/var/log/nova/nova-cert.log",
+    "/var/log/nova/nova-conductor.log",
+    "/var/log/nova/nova-consoleauth.log",
+    "/var/log/nova/nova-scheduler.log"
+    ],
+    neutron: [
+    "/var/log/neutron/openvswitch-agent.log",
+    "/var/log/neutron/server.log",
+    "/var/log/neutron/dhcp-agent.log",
+    "/var/log/neutron/l3-agent.log",
+    "/var/log/neutron/metadata-agent.log"
+    ],
+    cinder: [
+    "/var/log/cinder/api.log",
+    "/var/log/cinder/scheduler.log",
+    "/var/log/cinder/volume.log"
+    ]
+  },
+  server: {
+    host: '{{ loghost_ip | default(hostvars[groups['loghost'][0]]['ansible_default_ipv4']['address']) }}',
+    port: 28777
+  }
+}

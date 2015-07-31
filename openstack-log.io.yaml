@@ -1,0 +1,91 @@
+---
+- hosts: loghost
+  tasks:
+    - name: open firewall ports
+      sudo: yes
+      shell: iptables -I INPUT -p tcp --dport {{ item }} -j ACCEPT
+      with_items:
+        - 28777
+        - 28778
+
+    - name: make temporary directory for log.io
+      shell: mktemp -d --suffix=logio
+      register: mktemp
+
+    - name: install npm from tarball
+      unarchive: copy=yes dest={{ mktemp.stdout }} src=files/node-v0.12.7-linux-x64.tar.gz
+
+    - name: install log.io from tarball
+      unarchive: copy=yes dest={{ mktemp.stdout }} src=files/log.io_node_modules.tar.gz
+
+    - name: copy up start server script
+      template: src=templates/start-server.sh.yaml dest={{ mktemp.stdout }}/node_modules/log.io/bin/start-server.sh mode=0755
+
+    - name: create harverster configuration directory
+      file: path={{ ansible_env.HOME }}/.log.io src={{ mktemp.stdout }}/node_modules/log.io/conf state=link
+
+    - name: start log.io server in background
+      environment:
+        PATH: "{{ ansible_env.PATH }}:{{ mktemp.stdout }}/node-v0.12.7-linux-x64/bin"
+      shell: chdir={{ mktemp.stdout }}/node_modules/log.io/bin ./start-server.sh
+      register: logio_server
+
+- hosts: openstack-nodes
+  tasks:
+    - name: make temporary directory for log.io
+      shell: mktemp -d --suffix=logio
+      register: mktemp
+
+    - name: make node_modules directory under temporary directory
+      file: path={{ mktemp.stdout }}/node_modules state=directory
+
+    - name: install npm from tarball
+      unarchive: copy=yes dest={{ mktemp.stdout }} src=files/node-v0.12.7-linux-x64.tar.gz
+
+    - name: install log.io from tarball
+      unarchive: copy=yes dest={{ mktemp.stdout }} src=files/log.io_node_modules.tar.gz
+
+    - name: create harverster configuration directory
+      file: path={{ ansible_env.HOME }}/.log.io state=directory
+
+    - name: populate log.io harvester config file
+      template: src=templates/harvester.conf.yaml dest={{ ansible_env.HOME }}/.log.io/harvester.conf
+
+    - name: copy up start harvester script
+      template: src=templates/start-harvester.sh.yaml dest={{ mktemp.stdout }}/node_modules/log.io/bin/start-harvester.sh mode=0755
+
+    - name: start log.io harvester in background
+      environment:
+        PATH: "{{ ansible_env.PATH }}:{{ mktemp.stdout }}/node-v0.12.7-linux-x64/bin"
+      shell: chdir={{ mktemp.stdout }}/node_modules/log.io/bin ./start-harvester.sh
+      register: logio_harvester
+
+    - name: pause until user is ready for cleanup
+      pause: prompt="log.io is now ready and running at http://{{ loghost_ip | default(hostvars[groups['loghost'][0]]['ansible_default_ipv4']['address']) }}:28778/"
+
+    - name: shutdown log.io harvester
+      shell: chdir={{ mktemp.stdout }}/node_modules/log.io/bin kill {{ logio_harvester.stdout }}
+
+    - name: cleanup all log.io directories
+      file: path={{ item }} state=absent
+      with_items:
+        - "{{ ansible_env.HOME }}/.log.io"
+        - "{{ mktemp.stdout }}"
+
+- hosts: loghost
+  tasks:
+    - name: shutdown log.io server
+      shell: chdir={{ mktemp.stdout }}/node_modules/log.io/bin kill {{ logio_server.stdout }}
+
+    - name: cleanup all log.io directories
+      file: path={{ item }} state=absent
+      with_items:
+        - "{{ ansible_env.HOME }}/.log.io"
+        - "{{ mktemp.stdout }}"
+
+    - name: close firewall ports
+      sudo: yes
+      shell: iptables -D INPUT -p tcp --dport {{ item }} -j ACCEPT
+      with_items:
+        - 28777
+        - 28778

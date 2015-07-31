@@ -1,0 +1,7 @@
+[loghost]
+localhost ansible_connection=local
+
+[openstack-nodes]
+controller-01.example.com
+compute-01.example.com
+network-01.example.com
