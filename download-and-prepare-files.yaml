@@ -13,7 +13,7 @@
 
     - name: install log.io via npm
       environment:
-        PATH: "files/node-v0.12.7-linux-x64/bin:{{ ansible_env.PATH }}"
+        PATH: "node-v0.12.7-linux-x64/bin:{{ ansible_env.PATH }}"
       shell: chdir=files creates=files/node_modules/log.io npm install log.io
 
     - name: create tar.gz of log.io
